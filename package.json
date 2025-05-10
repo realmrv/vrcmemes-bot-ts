@@ -1,0 +1,24 @@
+{
+  "name": "vrcmemes-bot",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@grammyjs/i18n": "^1.1.2",
+    "dotenv": "^16.5.0",
+    "grammy": "^1.36.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "bun-types": "^1.2.12",
+    "typescript": "^5.8.3"
+  }
+}

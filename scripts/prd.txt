@@ -1,0 +1,12 @@
+Project: Telegram Bot with grammY
+
+Description: A Telegram bot built using the grammY framework.
+
+Features:
+1. Welcome Message:
+   - Command: /start
+   - Action: The bot should greet the user when they send the /start command.
+
+2. Help Command:
+   - Command: /help
+   - Action: The bot should provide a description of all available commands when the user sends the /help command.
