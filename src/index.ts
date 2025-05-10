@@ -16,34 +16,33 @@ if (!botToken) {
 
 // Define custom context type with i18n and session flavor
 interface SessionData { 
-  __language_code?: string; // Store user's language preference
+  language_code?: string; // Store user's language preference
 }
 export type MyContext = Context & I18nFlavor & SessionFlavor<SessionData>;
 
 // Create a new bot instance with the custom context
 const bot = new Bot<MyContext>(botToken);
 
+const DEFAULT_LOCALE = process.env.DEFAULT_LOCALE ?? 'ru';
+
 // Initialize i18n
 const localesPath = path.resolve(__dirname, '../locales');
 console.log(`[i18n] Resolved locales directory path: ${localesPath}`);
 
-const i18n = new I18n<MyContext>({
+const i18n: I18n<MyContext> = new I18n<MyContext>({
   directory: localesPath,
-  defaultLocale: 'ru',
+  defaultLocale: DEFAULT_LOCALE,
   useSession: true, // Use session to store language preference
-  localeNegotiator: (ctx) => {
-    const langFromSession = ctx.session.__language_code;
-    return langFromSession || i18n.config.defaultLocale; 
-  },
-  setter: (ctx, code) => {
-    ctx.session.__language_code = code;
+  localeNegotiator: (ctx: MyContext): string => {
+    const langFromSession = ctx.session.language_code;
+    return langFromSession ?? DEFAULT_LOCALE; 
   },
 });
 
 // Initialize session middleware
 // Note: session middleware must be installed BEFORE i18n middleware
 bot.use(session({ 
-  initial: (): SessionData => ({ __language_code: undefined }), // Initialize session data
+  initial: (): SessionData => ({ language_code: undefined }), // Initialize session data
   storage: new MemorySessionStorage<SessionData>(), // Use MemorySessionStorage from 'grammy'
 }));
 
@@ -76,12 +75,9 @@ bot.command("language", async (ctx: MyContext) => {
   if (!ctx.match) { // No argument provided
     let message = ctx.t('language_current_is', { lang: initialEffectiveLocale });
     message += "\n" + ctx.t('language_available_languages');
-    availableLocales.forEach(locale => {
-      let langName = locale;
-      try {
-        langName = ctx.t(`lang_name_${locale}`); 
-        if (langName === `lang_name_${locale}`) langName = locale; // Fallback if translation is missing
-      } catch (e) {
+    availableLocales.forEach((locale: string) => {
+      let langName = ctx.t(`lang_name_${locale}`); 
+      if (langName === `lang_name_${locale}`) { // Fallback if translation is missing
         langName = locale;
       }
       message += `\n- ${locale} (${langName})`;
@@ -89,7 +85,7 @@ bot.command("language", async (ctx: MyContext) => {
     message += "\n\n" + ctx.t('language_set_command_usage');
     await ctx.reply(message);
   } else {
-    const targetLocale = ctx.match.toLowerCase().trim();
+    const targetLocale = (ctx.match as string).toLowerCase().trim();
     if (i18n.locales.includes(targetLocale)) {
       await ctx.i18n.setLocale(targetLocale); 
       await ctx.reply(ctx.t('language_set_to', { lang: targetLocale })); 
@@ -113,11 +109,11 @@ bot.catch((err) => {
   }
 });
 
+console.log('Bot instance created. Attempting to connect to Telegram...');
+
 // Start the bot
 bot.start({
   onStart: (botInfo) => {
-    console.log(`Bot @${botInfo.username} is starting... (initialized)`);
+    console.log(`Bot @${botInfo.username} has successfully started and is running.`);
   },
 });
-
-console.log('Bot instance created. Attempting to connect to Telegram...');
