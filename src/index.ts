@@ -3,6 +3,29 @@ import { Bot, GrammyError, HttpError, Context, session, SessionFlavor, MemorySes
 import { I18n, I18nFlavor } from '@grammyjs/i18n'; 
 import 'dotenv/config'; // Loads environment variables from .env file
 import path from 'path'; // Import path module
+import * as Sentry from "@sentry/node";
+
+const debug = process.env.DEBUG === 'true';
+const appEnv = process.env.APP_ENV ?? 'production';
+const version = process.env.VERSION ?? 'dev';
+
+// Initialize Sentry
+const sentryDsn = process.env.SENTRY_DSN;
+if (sentryDsn) {
+  Sentry.init({
+    debug: debug,
+    environment: appEnv,
+    release: version,
+    dsn: sentryDsn,
+    // Set tracesSampleRate to 1.0 to capture 100%
+    // of transactions for performance monitoring.
+    // We recommend adjusting this value in production
+    tracesSampleRate: 1.0,
+  });
+  console.log('[Sentry] Sentry initialized successfully.');
+} else {
+  console.warn('[Sentry] SENTRY_DSN not found in .env file. Sentry will not be initialized.');
+}
 
 // Get the bot token from environment variables
 const botToken = process.env.BOT_TOKEN;
@@ -100,6 +123,19 @@ bot.catch((err) => {
   const ctx = err.ctx;
   console.error(`Error while handling update ${ctx.update.update_id}:`);
   const e = err.error;
+
+  // Capture exception with Sentry
+  if (sentryDsn) {
+    Sentry.captureException(e, {
+      extra: {
+        update_id: ctx.update.update_id,
+        // Add any other relevant context information here
+        ...(ctx.chat && { chat_id: ctx.chat.id, chat_type: ctx.chat.type }),
+        ...(ctx.from && { user_id: ctx.from.id, user_username: ctx.from.username }),
+      },
+    });
+  }
+
   if (e instanceof GrammyError) {
     console.error('Error in request:', e.description);
   } else if (e instanceof HttpError) {
