@@ -39,7 +39,7 @@ if (!botToken) {
 
 // Define custom context type with i18n and session flavor
 interface SessionData { 
-  language_code?: string; // Store user's language preference
+  __language_code?: string; // Store user's language preference using grammy-i18n default key
 }
 export type MyContext = Context & I18nFlavor & SessionFlavor<SessionData>;
 
@@ -57,7 +57,7 @@ const i18n: I18n<MyContext> = new I18n<MyContext>({
   defaultLocale: DEFAULT_LOCALE,
   useSession: true, // Use session to store language preference
   localeNegotiator: (ctx: MyContext): string => {
-    const langFromSession = ctx.session.language_code;
+    const langFromSession = ctx.session.__language_code; // Read from grammy-i18n default key
     return langFromSession ?? DEFAULT_LOCALE; 
   },
 });
@@ -65,7 +65,7 @@ const i18n: I18n<MyContext> = new I18n<MyContext>({
 // Initialize session middleware
 // Note: session middleware must be installed BEFORE i18n middleware
 bot.use(session({ 
-  initial: (): SessionData => ({ language_code: undefined }), // Initialize session data
+  initial: (): SessionData => ({ __language_code: undefined }), // Initialize session data with grammy-i18n default key
   storage: new MemorySessionStorage<SessionData>(), // Use MemorySessionStorage from 'grammy'
 }));
 
