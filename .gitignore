@@ -42,3 +42,6 @@ typings/
 # Task files
 tasks.json
 tasks/
+
+# Other
+package-lock.json

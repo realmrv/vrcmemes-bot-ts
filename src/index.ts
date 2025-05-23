@@ -43,6 +43,7 @@ export interface SessionData {
 interface AppConfig {
   defaultLocale: string;
   botUsername?: string; // Optional, as it's set onStart
+  debug: boolean; // Add debug property to AppConfig
 }
 
 export type MyContext = Context & I18nFlavor & SessionFlavor<SessionData> & { config: AppConfig };
@@ -67,6 +68,7 @@ const i18n: I18n<MyContext> = new I18n<MyContext>({
 const configMiddleware = (ctx: MyContext, next: () => Promise<void>) => {
   ctx.config = {
     defaultLocale: DEFAULT_LOCALE,
+    debug: debug, // Add debug to config
     // botUsername will be set by bot.start's onStart or can be accessed via ctx.me.username
   };
   return next();
@@ -83,7 +85,7 @@ export const handleHelpCommand = async (ctx: MyContext) => {
   helpMessage += `\n- /help - ${ctx.t('help_command_help')}`;
   helpMessage += `\n- /language [code] - ${ctx.t('help_command_language')}`;
   helpMessage += `\n- /ping - ${ctx.t('help_command_ping')}`;
-  if (debug) {
+  if (ctx.config.debug) { 
     helpMessage += `\n- /debug - ${ctx.t('help_command_debug')}`;
   }
   await ctx.reply(helpMessage);
@@ -97,7 +99,7 @@ export const handlePingCommand = async (ctx: MyContext) => {
 };
 
 export const handleDebugCommand = async (ctx: MyContext) => {
-  if (!debug) { // Double check, though registration is conditional
+  if (!ctx.config.debug) { 
     await ctx.reply('Debug mode is off.');
     return;
   }

@@ -46,7 +46,8 @@ const mockCtx = (overrides: Partial<MyContext> = {}): MyContext => {
     } as any,
     config: {
         defaultLocale: 'ru',
-        botUsername: 'TestBotUsername'
+        botUsername: 'TestBotUsername',
+        debug: false, // Add debug property with a default value
     },
     // Add other properties/methods as needed by handlers
   };
@@ -90,39 +91,72 @@ describe('Bot Command Handlers', () => {
   });
 
   describe('/help command (handleHelpCommand)', () => {
-    it('should reply with the help message header and all command descriptions', async () => {
-      // Mock t to return specific strings for help keys
-      const helpKeyValues: Record<string, string> = {
-        help_message_header: 'Available commands:',
+    const mockTWithSpecifics = (
+      specifics: Record<string, string>,
+      defaultLang = 'ru', // Default to 'ru' as per original mockCtx
+    ) => {
+      return jest.fn((key: string, params?: Record<string, any>) => {
+        if (key in specifics) {
+          const translation = specifics[key];
+          return params ? `${translation} ${JSON.stringify(params)}` : translation;
+        }
+        // Fallback for keys not in specifics, like language_current_is
+        if (key === 'language_current_is') return `Текущий язык: ${params?.lang ?? defaultLang}.`;
+        if (key === 'language_available_languages') return 'Доступные языки:';
+        if (key.startsWith('lang_name_')) return key.split('_')[2].toUpperCase(); // e.g., lang_name_en -> EN
+
+        return key; // Default mock behavior for unmocked keys
+      });
+    };
+
+    it('should reply with the help message including debug command when debug is true', async () => {
+      const specificTranslations = {
+        help_message_header: 'Available commands:', // This comes directly from t()
         help_command_start: 'Start the bot',
         help_command_help: 'Show this help message',
-        help_command_language: 'Change language',
-        help_command_ping: 'Check bot latency',
-        help_command_debug: 'Show debug info',
+        help_command_language:
+          '[lang_code] - Change language (e.g., /language en). Available: en, ru. If no code, shows current and available languages.',
+        help_command_ping: "Check bot's responsiveness",
+        help_command_debug: 'Show debug information (for bot owner)',
       };
-      (ctx.t as jest.Mock).mockImplementation((key: string) => helpKeyValues[key] ?? key);
+      // Use 'en' for this test to match the English translations provided
+      ctx.t = mockTWithSpecifics(specificTranslations, 'en'); 
+      ctx.config.debug = true; // Simulate debug mode ON
+      (ctx.i18n.getLocale as jest.Mock).mockResolvedValue('en');
 
       await handleHelpCommand(ctx);
 
-      // Construct expected message based on how handleHelpCommand formats it
-      let expectedMessage = helpKeyValues.help_message_header;
-      expectedMessage += `\n- /start - ${helpKeyValues.help_command_start}`;
-      expectedMessage += `\n- /help - ${helpKeyValues.help_command_help}`;
-      expectedMessage += `\n- /language [code] - ${helpKeyValues.help_command_language}`;
-      expectedMessage += `\n- /ping - ${helpKeyValues.help_command_ping}`;
-      // Assuming debug is true for the test environment where commands are registered
-      // or that the test environment always includes debug for simplicity of testing the help message.
-      // The actual conditional registration of /debug is an integration concern.
-      expectedMessage += `\n- /debug - ${helpKeyValues.help_command_debug}`;
-
+      let expectedMessage = specificTranslations.help_message_header;
+      expectedMessage += `\n- /start - ${specificTranslations.help_command_start}`;
+      expectedMessage += `\n- /help - ${specificTranslations.help_command_help}`;
+      expectedMessage += `\n- /language [code] - ${specificTranslations.help_command_language}`;
+      expectedMessage += `\n- /ping - ${specificTranslations.help_command_ping}`;
+      expectedMessage += `\n- /debug - ${specificTranslations.help_command_debug}`;
       expect(ctx.reply).toHaveBeenCalledWith(expectedMessage);
     });
 
-    // Testing the 'debug is false' path for help_command_debug is tricky
-    // because 'debug' is a module-level const in index.ts.
-    // The primary protection is conditional registration of the /debug command itself.
-    // If we wanted to test the help message specifically when debug is false,
-    // we'd need a more complex setup, possibly involving jest.mock for '../index'.
+    it('should reply with the help message excluding debug command when debug is false', async () => {
+      const specificTranslations = {
+        help_message_header: 'Available commands:',
+        help_command_start: 'Start the bot',
+        help_command_help: 'Show this help message',
+        help_command_language:
+          '[lang_code] - Change language (e.g., /language en). Available: en, ru. If no code, shows current and available languages.',
+        help_command_ping: "Check bot's responsiveness",
+      };
+      ctx.t = mockTWithSpecifics(specificTranslations, 'en');
+      ctx.config.debug = false; // Simulate debug mode OFF
+      (ctx.i18n.getLocale as jest.Mock).mockResolvedValue('en');
+
+      await handleHelpCommand(ctx);
+
+      let expectedMessage = specificTranslations.help_message_header;
+      expectedMessage += `\n- /start - ${specificTranslations.help_command_start}`;
+      expectedMessage += `\n- /help - ${specificTranslations.help_command_help}`;
+      expectedMessage += `\n- /language [code] - ${specificTranslations.help_command_language}`;
+      expectedMessage += `\n- /ping - ${specificTranslations.help_command_ping}`;
+      expect(ctx.reply).toHaveBeenCalledWith(expectedMessage);
+    });
   });
 
   describe('/ping command (handlePingCommand)', () => {
@@ -253,6 +287,7 @@ describe('Bot Command Handlers', () => {
         chat: { id: 654, type: 'group' } as any,
         session: { __language_code: 'ru' },
       });
+      testCtx.config.debug = true; // Ensure debug mode is on for this test
       (testCtx.i18n.getLocale as jest.Mock).mockResolvedValue('ru');
 
       // We assume 'debug' is true for this handler to be called and for its internal check to pass.
@@ -274,6 +309,7 @@ describe('Bot Command Handlers', () => {
         chat: undefined,
         session: { __language_code: 'en' },
       });
+      minimalCtx.config.debug = true; // Ensure debug mode is on for this test
       (minimalCtx.i18n.getLocale as jest.Mock).mockResolvedValue('en');
 
       await handleDebugCommand(minimalCtx);
@@ -292,5 +328,15 @@ describe('Bot Command Handlers', () => {
     // within the scope of the imported handleDebugCommand. As discussed for handleHelpCommand,
     // this is complex due to the module-level 'debug' const in index.ts.
     // The primary protection against running /debug when debug is off is its conditional registration.
+    // However, now that handleDebugCommand uses ctx.config.debug, we can test this path.
+    it('should reply that debug mode is off if ctx.config.debug is false', async () => {
+      const testCtx = mockCtx();
+      testCtx.config.debug = false; // Explicitly set debug mode to OFF
+
+      await handleDebugCommand(testCtx);
+
+      expect(testCtx.reply).toHaveBeenCalledTimes(1);
+      expect(testCtx.reply).toHaveBeenCalledWith('Debug mode is off.');
+    });
   });
 });
